@@ -1,0 +1,7 @@
+{
+  "name": "Destruct",
+  "author": "DVD",
+  "main": "main.Main",
+  "description": "Base Destruct plugin",
+  "version": 0.1
+}
