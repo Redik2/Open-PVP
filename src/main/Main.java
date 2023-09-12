@@ -38,6 +38,8 @@ public class Main extends Plugin {
         
         logic.reset();
         Vars.state.rules = Rules.rules.copy();
+        MenuManager menuManager = new MenuManager();
+        menuManager.setupMenus();
 
 
 

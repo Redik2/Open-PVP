@@ -104,6 +104,12 @@ public class Localisation {
         localisation.put("InvalidFloor_ru", "[gray]<[cyan]SERVER[gray]> [#f]Недопустимый блок для размещения ядра");
         localisation.put("InvalidFloor_en", "[gray]<[cyan]SERVER[gray]> [#f]Invalid block to place core");
 
+        localisation.put("Support_ru", "Поддержать сервер");
+        localisation.put("Support_en", "Support server");
+
+        localisation.put("Discord_ru", "Дискорд");
+        localisation.put("Discord_en", "Discord");
+
         localisation.put("VotingStart_ru", "[gray]<[cyan]SERVER[gray]> [#78b193]Начинается голосование за рестарт!\nНапишите [cyan]/restart[#78b193] чтобы проголосовать [cyan]за[#78b193] рестарт\nГолосование окончиться через 1мин");
         localisation.put("VotingStart_en", "[gray]<[cyan]SERVER[gray]> [#78b193]Started voting for restart!\nSend [cyan]/restart[#78b193] to vote [cyan]for[#78b193] restart\nVoting ends in 1min");
 
