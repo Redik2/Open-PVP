@@ -1,17 +1,9 @@
 package main.Constants;
 
-import arc.struct.ObjectSet;
-import arc.struct.Seq;
 import mindustry.content.Blocks;
-import mindustry.game.SpawnGroup;
 import mindustry.game.Team;
-import mindustry.world.blocks.defense.turrets.ItemTurret;
-import mindustry.world.blocks.defense.turrets.LaserTurret;
-import mindustry.world.blocks.units.Reconstructor;
 
-import static mindustry.content.UnitTypes.*;
-
-public class Dest_Rules {
+public class Rules {
     public static final mindustry.game.Rules rules = new mindustry.game.Rules();
 
     static {

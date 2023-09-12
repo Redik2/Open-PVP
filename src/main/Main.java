@@ -1,6 +1,5 @@
 package main;
 
-import mindustry.world.Block;
 import mindustry.world.Tile;
 import mindustry.game.*;
 import mindustry.mod.Plugin;
@@ -11,22 +10,18 @@ import arc.util.*;
 import mindustry.*;
 import mindustry.content.*;
 import mindustry.gen.*;
-import mindustry.net.Administration;
+
 import java.lang.Math;
 
 import static mindustry.Vars.*;
+import static mindustry.Vars.player;
 
-import main.JoinRequest;
-import main.PlayerInfo;
-import main.TeamInfo;
-import main.Constants.*;
+import main.Constants.BlocksTypes;
+import main.Constants.Rules;
 
 import mindustry.net.Administration.Config;
 
 public class Main extends Plugin {
-    public List<Block> nonvalid_floors = new ArrayList<Block>();
-    public List<Block> valid_blocks = new ArrayList<Block>();
-    public List<Block> cores = new ArrayList<Block>();
     public Map<String, PlayerInfo> players_info = new HashMap<String, PlayerInfo>();
     public Map<Team, TeamInfo> teams_info = new HashMap<Team, TeamInfo>();
     public int last_team = 0;
@@ -40,55 +35,11 @@ public class Main extends Plugin {
     public void init(){
         Config.serverName.set("\uF714 [#6efacf]O[#76d5b1]p[#78b193]e[#768e77]n [#6f6c5c]P[#654b42]V[#582a2a]P");
         Config.motd.set("\uF714 [#6efacf]Discord server:[#0000ff] discord.gg/QdsUAazufw");
-        nonvalid_floors.add(Blocks.space);
-        nonvalid_floors.add(Blocks.slag);
-        nonvalid_floors.add(Blocks.tar);
-        nonvalid_floors.add(Blocks.deepwater);
-        nonvalid_floors.add(Blocks.cryofluid);
-        nonvalid_floors.add(Blocks.deepTaintedWater);
-        nonvalid_floors.add(Blocks.arkyciteFloor);
-
-        valid_blocks.add(Blocks.shaleBoulder);
-        valid_blocks.add(Blocks.sandBoulder);
-        valid_blocks.add(Blocks.daciteBoulder);
-        valid_blocks.add(Blocks.boulder);
-        valid_blocks.add(Blocks.snowBoulder);
-        valid_blocks.add(Blocks.basaltBoulder);
-        valid_blocks.add(Blocks.carbonBoulder);
-        valid_blocks.add(Blocks.ferricBoulder);
-        valid_blocks.add(Blocks.beryllicBoulder);
-        valid_blocks.add(Blocks.yellowStoneBoulder);
-        valid_blocks.add(Blocks.arkyicBoulder);
-        valid_blocks.add(Blocks.crystalCluster);
-        valid_blocks.add(Blocks.crystallineBoulder);
-        valid_blocks.add(Blocks.redIceBoulder);
-        valid_blocks.add(Blocks.rhyoliteBoulder);
-        valid_blocks.add(Blocks.redStoneBoulder);
-        valid_blocks.add(Blocks.sporeCluster);
-        valid_blocks.add(Blocks.air);
-
-        cores.add(Blocks.coreShard);
-        cores.add(Blocks.coreNucleus);
-        cores.add(Blocks.coreBastion);
-        cores.add(Blocks.coreCitadel);
-        cores.add(Blocks.coreFoundation);
-        cores.add(Blocks.coreAcropolis);
         
         logic.reset();
-        state.rules = Dest_Rules.rules.copy();
+        Vars.state.rules = Rules.rules.copy();
 
-        Vars.netServer.admins.addActionFilter(action -> 
-        {
-            if (action.type != Administration.ActionType.placeBlock) return true;
 
-            if (!valid_test(action.tile, action.player.team()) && action.block == Blocks.vault)
-            {
-                action.player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Слишком близко к вражескому ядру");
-                action.tile.setNet(Blocks.air);
-                return false;
-            }
-            return true;
-        });
 
         Events.on(EventType.WorldLoadEvent.class, event -> {
             players_info = new HashMap<String, PlayerInfo>();
@@ -106,22 +57,6 @@ public class Main extends Plugin {
             Log.info("world load");
         });
 
-        Events.on(EventType.BlockBuildEndEvent.class, event -> {
-            if (!event.breaking && event.tile.block() == Blocks.vault)
-            {
-                Core.app.post(() -> {
-                    event.tile.setNet(Blocks.coreShard, event.tile.build.team(), 0);
-                });
-
-                Groups.player.forEach(player -> {
-                    if (player.team() == event.tile.build.team()) 
-                    {
-                        player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Ядро установлено! [gray]Если вы не видите ядро, введите /sync");
-                    }
-                });
-            }
-        });
-
         Events.on(EventType.PlayerJoin.class, event -> {
             Player pl = event.player;
             if (!players_info.containsKey(pl.uuid()))
@@ -132,7 +67,16 @@ public class Main extends Plugin {
 
             if (pl.team() == Team.all[0])
             {
-                pl.sendMessage("[cyan]При нажатии по карте, на выбранном месте появитсья ваше ядро");
+                MenuManager.callGuideMenu(pl);
+            }
+        });
+
+        Events.on(EventType.PlayerLeave.class, event -> {
+            Player pl = event.player;
+            if (pl.team().data().buildings.size < 5)
+            {
+                kill_team(pl.team());
+                players_info.put(pl.uuid(), new PlayerInfo());
             }
         });
         
@@ -143,14 +87,20 @@ public class Main extends Plugin {
             if (player.team() == Team.all[0]) {
                 if (players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown > time)
                 {
-                    player.sendMessage("[gray]<[cyan]SERVER[gray]> [#ff9000]\uE80A [#ff2000]Ограничение скорости возрождения! Осталось: " + Math.round((players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown - time) / 60) + "сек");
+                    player.sendMessage(String.format(Localisation.local(player, "respawnSpeedErr"), Math.round((players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown - time) / 60)));
                     return;
                 }
-                if (!valid_test(tile, Team.all[0]))
+                if (BlocksTypes.nonvalid_floors.contains(tile.floor()))
                 {
-                    player.sendMessage("[gray]<[cyan]SERVER[gray]> [#ff9000]\uE80A [#ff2000]Слишком близко к вражескому ядру!");
+                    player.sendMessage(Localisation.local(player, "InvalidFloor"));
                     return;
                 }
+                if (!VaultLogic.valid_test(tile, Team.all[0]))
+                {
+                    player.sendMessage(Localisation.local(player, "closeEnemyErr"));
+                    return;
+                }
+
                 Team new_team = takeNewTeam();
                 tile.setNet(Blocks.coreNucleus, new_team, 0);
                 player.team(new_team);
@@ -174,11 +124,11 @@ public class Main extends Plugin {
                     voiting_time = 0;
                     voted = new ArrayList<String>();
                     Groups.player.forEach(p -> {
-                        p.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Время голосования вышло!");
+                        p.sendMessage(Localisation.local(player, "votingTimeEnd"));
                     });
                 } else if (voted.size() >= Math.round(Groups.player.size() * 0.5)) {
                     Groups.player.forEach(p -> {
-                        p.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Сервер перезагружается!\nГолосование окончено");
+                        p.sendMessage(Localisation.local(player, "votingRestart"));
                         restart();
                     });
                     restart_voiting = false;
@@ -220,24 +170,24 @@ public class Main extends Plugin {
                                     {
                                         if (request.status == 1)
                                         {
-                                            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Вы были приняты в команду #" + team.id);
+                                            player.sendMessage(String.format(Localisation.local(player, "AcceptPlayer"), team.id));
                                             player.team(team);
                                             players_info.get(player.uuid()).team = team;
                                         }
                                         else if (request.status == 2)
                                         {
-                                            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Вы не были приняты в команду #" + team.id);
+                                            player.sendMessage(String.format(Localisation.local(player, "DenyPlayer"), team.id));
                                         }
                                     }
                                     else if (player.team() == team)
                                     {
                                         if (request.status == 1)
                                         {
-                                            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Запрос принят!");
+                                            player.sendMessage(Localisation.local(player, "AcceptPlayerToTeam"));
                                         }
                                         else if (request.status == 2)
                                         {
-                                            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Запрос отклонен!");
+                                            player.sendMessage(Localisation.local(player, "DenyPlayerToTeam"));
                                         }
                                     }
                                 });
@@ -259,7 +209,7 @@ public class Main extends Plugin {
                     int time_left = maxTime - time;
                     int minute = (int)(time_left / 60 / 60 % 60);
                     int hour = (int)(time_left / 60 / 60 / 60 % 60);
-                    Config.desc.set("[#78b193]PVP в открытом мире\n[#78b193]До вайпа: [cyan]" + (hour > 0 ? hour + "h " : " ") + (minute > 0 ? minute + "m" : ""));
+                    Config.desc.set("[#78b193]Open world PVP with mixtech\n[#78b193]Restart in [cyan]" + (hour > 0 ? hour + "h " : " ") + (minute > 0 ? minute + "m" : ""));
                     
                     for (Team team : Team.all) 
                     {
@@ -274,7 +224,7 @@ public class Main extends Plugin {
                         if (tile.build != null) {
                             Team bteam = tile.build.team();
                             TeamInfo info = teams_info.get(bteam);
-                            if (cores.contains(tile.block()) && !cores_was.contains(tile.build)) 
+                            if (BlocksTypes.cores.contains(tile.block()) && !cores_was.contains(tile.build))
                             {
                                 if (bteam == Team.all[0])
                                 {
@@ -299,7 +249,7 @@ public class Main extends Plugin {
                     
                     Groups.player.forEach(p -> {
                         Team team = p.team();
-                        String text = "[#78b193]Максимум юнитов: [cyan]" + (teams_info.get(team).units_cap) + "[white]\n[#78b193]Максимум предметов: [cyan]";
+                        String text = String.format(Localisation.local(p, "MaxUnitsAndItems"), teams_info.get(team).units_cap);
                         float sub = 1000;
                         int ks = 0;
 
@@ -315,7 +265,7 @@ public class Main extends Plugin {
                         {
                             text += "K";
                         }
-                        text += "\n[#78b193]До вайпа: [cyan]" + (hour > 0 ? hour + "ч " : "") + (minute > 0 ? minute + "мин" : "");
+                        text += "\n" + Localisation.local(p, "TimeLeft") + (hour > 0 ? hour + "h " : "") + (minute > 0 ? minute + "min" : "");
 
                         Call.infoPopup(p.con, text, 1f, Align.topLeft, 85, 5, 0, 0);
                     });
@@ -337,9 +287,9 @@ public class Main extends Plugin {
             Tile tile = player.tileOn();
             if (tile.build != null && tile.build.team() == player.team()) {
                 tile.build.kill();
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Блок уничтожен");
+                player.sendMessage(Localisation.local(player, "Destroyed"));
             } else {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Вы не можете взорвать этот блок!");
+                player.sendMessage(Localisation.local(player, "CantDestroy"));
             }
         });
 
@@ -350,28 +300,28 @@ public class Main extends Plugin {
         handler.<Player>register("join", "<id>", "Позволяет вступить в команду другого игрока", (args, player) -> {
             if (!isInteger(args[0]))
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Это не ID");
+                player.sendMessage(Localisation.local(player, "NotID"));
                 return;
             }
             Integer id = Integer.valueOf(args[0]);
             if (id == 0)
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Для вступления в спектаторы, напишите /spectate");
+                player.sendMessage(Localisation.local(player, "SpectatorTip"));
                 return;
             }
             if (!Team.all[id].active())
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Можно присоедениться только к активной команде");
+                player.sendMessage(Localisation.local(player, "NotActive"));
                 return;
             }
             if (id == player.team().id)
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Вы уже в команде #" + id);
+                player.sendMessage(String.format(Localisation.local(player, "SameTeam"), id));
                 return;
             }
             if (player.team().id != 0)
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Можно отправить запрос только если вы спектатор");
+                player.sendMessage(Localisation.local(player, "OnlySpectator"));
                 return;
             }
             for (Team team : Team.all) 
@@ -383,7 +333,7 @@ public class Main extends Plugin {
                     {
                         if (request.player == player.uuid())
                         {
-                            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]У вас уже есть активный запрос");
+                            player.sendMessage(Localisation.local(player, "AlreadyHaveActive"));
                             return;
                         }
                     }
@@ -391,12 +341,12 @@ public class Main extends Plugin {
             }
             TeamInfo info = teams_info.get(Team.all[id]);
             info.join_requests.add(new JoinRequest(player.uuid(), time));
-            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Вы отправили запрос на вступление в команду #" + id);
+            player.sendMessage(String.format(Localisation.local(player, "RequestSent"), id));
 
             Groups.player.forEach(p -> {
                 if (p.team().id == id)
                 {
-                    p.sendMessage("[gray]<[cyan]SERVER[gray]> [white]" + player.name + " [#78b193]запрашивает присоеденение к вашей команде. Любой ее участник может написать [green]/accept[#78b193] или [red]/deny");
+                    p.sendMessage(String.format(Localisation.local(player, "RequestMessageToTeam"), player.name));
                 }
             });
         });
@@ -405,7 +355,7 @@ public class Main extends Plugin {
             TeamInfo info = teams_info.get(player.team());
             if (info.join_requests.size() == 0)
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]У вас нет активных запросов на вступление");
+                player.sendMessage(Localisation.local(player, "HaventAnyRequests"));
                 return;
             }
             for (int i = 1; i <= info.join_requests.size(); i++)
@@ -422,7 +372,7 @@ public class Main extends Plugin {
             TeamInfo info = teams_info.get(player.team());
             if (info.join_requests.size() == 0)
             {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]У вас нет активных запросов на вступление");
+                player.sendMessage(Localisation.local(player, "HaventAnyRequests"));
                 return;
             }
             for (int i = 1; i <= info.join_requests.size(); i++)
@@ -442,13 +392,8 @@ public class Main extends Plugin {
                 players_info.get(player.uuid()).team = Team.all[0];
                 player.team(Team.all[0]);
             } else {
-                player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Вы уже спектатор!");
+                player.sendMessage(Localisation.local(player, "AlreadySpectate"));
             }
-        });
-
-        handler.<Player>register("time", " ", "Показывает время до вайпа", (args, player) -> {
-            String text = "[#78b193]" + (int)Math.round((maxTime - time) / 360) / 10.0 + " минут [cyan]до вайпа";
-            player.sendMessage(text);
         });
 
         handler.<Player>register("restart", " ", "Vote to restart map", (args, player) -> {
@@ -456,14 +401,14 @@ public class Main extends Plugin {
                 if (!voted.contains(player.uuid())) {
                     voted.add(player.uuid());
                     Groups.player.forEach(p -> {
-                        p.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]" + voted.size() + "/" + Math.round(Groups.player.size() * 0.5) + " проголосовали за рестарт");
+                        p.sendMessage(String.format(Localisation.local(player, "VotingScore"), voted.size(), Math.round(Groups.player.size() * 0.5)));
                     });
                 } 
-                else player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Вы уже голосовали");
+                else player.sendMessage(Localisation.local(player, "Voted"));
             } else {
                 voted.add(player.uuid());
                 Groups.player.forEach(p -> {
-                    p.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Начинается голосование за рестарт!\nНапишите [cyan]/restart[#78b193] чтобы проголосовать [cyan]за[#78b193] рестарт\nГолосование окончиться через 1мин");
+                    p.sendMessage(Localisation.local(player, "VotingStart"));
                 });
                 restart_voiting = true;
                 Groups.player.forEach(p -> {
@@ -512,27 +457,6 @@ public class Main extends Plugin {
             }
         }
         return true;
-    }
-
-    public Boolean valid_test(Tile tile, Team team) {
-        Boolean is_valid = true;
-        for (int x_add = -100; x_add <= 100; x_add+=3)
-        {
-            for (int y_add = -100; y_add <= 100; y_add+=3)
-            {
-                if (Math.sqrt((x_add * x_add) + (y_add * y_add)) < 100)
-                {
-                    Tile test_tile = Vars.world.tile(tile.x + x_add, tile.y + y_add);
-                    if ((test_tile != null) && (cores.contains(test_tile.block())) && (test_tile.build.team() != team))
-                    {
-                        is_valid = false;
-                        break;
-                    }
-                }
-            }
-            if (!is_valid) break;
-        }
-        return is_valid;
     }
 
     public void restart() {
