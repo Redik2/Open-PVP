@@ -1,84 +1,29 @@
 package main;
 
-import mindustry.world.Build;
 import mindustry.world.Block;
 import mindustry.world.Tile;
 import mindustry.game.*;
-import mindustry.world.blocks.environment.Floor;
 import mindustry.mod.Plugin;
 
 import java.util.*;
-
-import javax.swing.text.html.BlockView;
-
-import mindustry.type.*;
 import arc.*;
 import arc.util.*;
 import mindustry.*;
 import mindustry.content.*;
 import mindustry.gen.*;
-import mindustry.mod.*;
 import mindustry.net.Administration;
-import mindustry.world.blocks.storage.*;
-import mindustry.core.GameState;
-import mindustry.core.Logic;
 import java.lang.Math;
-import java.lang.reflect.Array;
-import java.time.Year;
 
 import static mindustry.Vars.*;
 
-import main.Main.JoinRequest;
-import main.Main.PlayerInfo;
-import main.Main.TeamInfo;
+import main.JoinRequest;
+import main.PlayerInfo;
+import main.TeamInfo;
 import main.Constants.*;
 
 import mindustry.net.Administration.Config;
 
 public class Main extends Plugin {
-
-    public class TeamInfo
-    {
-        public Integer units_cap;
-        public Integer item_cap;
-        public Integer score;
-        public ArrayList<JoinRequest> join_requests;
-
-        public TeamInfo()
-        {
-            this.units_cap = 0;
-            this.item_cap = 0;
-            this.score = 0;
-            this.join_requests = new ArrayList<JoinRequest>();
-        }
-    }
-
-    public class PlayerInfo
-    {
-        public Team team;
-        public Integer respawn_coldown;
-
-        public PlayerInfo()
-        {
-            this.team = Team.all[0];
-            this.respawn_coldown = 0;
-        }
-    }
-
-    public class JoinRequest
-    {
-        public String player;
-        public Integer time;
-        public Integer status;
-
-        public JoinRequest(String uuid, Integer time)
-        {
-            this.player = uuid;
-            this.time = time;
-            this.status = 0;
-        }
-    }
-
     public List<Block> nonvalid_floors = new ArrayList<Block>();
     public List<Block> valid_blocks = new ArrayList<Block>();
     public List<Block> cores = new ArrayList<Block>();
