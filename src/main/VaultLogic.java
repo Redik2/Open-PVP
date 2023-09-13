@@ -12,7 +12,7 @@ import mindustry.world.Tile;
 import main.Constants.BlocksTypes;
 
 public class VaultLogic {
-    public VaultLogic() {
+    public static void init() {
         Vars.netServer.admins.addActionFilter(action ->
         {
             if (action.type != Administration.ActionType.placeBlock) return true;
