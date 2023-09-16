@@ -37,7 +37,7 @@ public class Main extends Plugin {
         Config.motd.set("\uF714 [#6efacf]Discord server:[#0000ff] discord.gg/QdsUAazufw");
         
         logic.reset();
-        Vars.state.rules = Rules.rules.copy();
+        Rules.init(Vars.state.rules);
         MenuManager menuManager = new MenuManager();
         VaultLogic.init();
         menuManager.setupMenus();
@@ -60,8 +60,14 @@ public class Main extends Plugin {
             Log.info("world load");
         });
 
+        Events.on(EventType.WorldLoadEndEvent.class, event -> {
+
+            Log.info("world load end");
+        });
+
         Events.on(EventType.PlayerJoin.class, event -> {
             Player pl = event.player;
+            Log.info(pl.locale);
             if (!players_info.containsKey(pl.uuid()))
             {
                 players_info.put(pl.uuid(), new PlayerInfo());
@@ -126,12 +132,12 @@ public class Main extends Plugin {
                     restart_voiting = false;
                     voiting_time = 0;
                     voted = new ArrayList<String>();
-                    Groups.player.forEach(p -> {
-                        p.sendMessage(Localisation.local(player, "votingTimeEnd"));
+                    Groups.player.forEach(player -> {
+                        player.sendMessage(Localisation.local(player, "votingTimeEnd"));
                     });
                 } else if (voted.size() >= Math.round(Groups.player.size() * 0.5)) {
-                    Groups.player.forEach(p -> {
-                        p.sendMessage(Localisation.local(player, "votingRestart"));
+                    Groups.player.forEach(player -> {
+                        player.sendMessage(Localisation.local(player, "votingRestart"));
                         restart();
                     });
                     restart_voiting = false;
@@ -404,18 +410,18 @@ public class Main extends Plugin {
                 if (!voted.contains(player.uuid())) {
                     voted.add(player.uuid());
                     Groups.player.forEach(p -> {
-                        p.sendMessage(String.format(Localisation.local(player, "VotingScore"), voted.size(), Math.round(Groups.player.size() * 0.5)));
+                        p.sendMessage(String.format(Localisation.local(p, "VotingScore"), voted.size(), Math.round(Groups.player.size() * 0.5)));
                     });
                 } 
                 else player.sendMessage(Localisation.local(player, "Voted"));
             } else {
                 voted.add(player.uuid());
                 Groups.player.forEach(p -> {
-                    p.sendMessage(Localisation.local(player, "VotingStart"));
+                    p.sendMessage(Localisation.local(p, "VotingStart"));
                 });
                 restart_voiting = true;
                 Groups.player.forEach(p -> {
-                    p.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]" + voted.size() + "/" + Math.round(Groups.player.size() * 0.5) + " проголосовали за рестарт");
+                    p.sendMessage(String.format(Localisation.local(p, "VotingScore"), voted.size(), Math.round(Groups.player.size() * 0.5)));
                 });
             }
         });

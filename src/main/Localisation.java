@@ -110,6 +110,9 @@ public class Localisation {
         localisation.put("Discord_ru", "Дискорд");
         localisation.put("Discord_en", "Discord");
 
+        localisation.put("CoreSet_ru", "[gray]<[cyan]SERVER[gray]> [#78b193]Ядро установлено! [gray]Если вы не видите ядро, введите /sync");
+        localisation.put("CoreSet_en", "[gray]<[cyan]SERVER[gray]> [#78b193]Core placed! [gray]If you cant see core, use /sync");
+
         localisation.put("VotingStart_ru", "[gray]<[cyan]SERVER[gray]> [#78b193]Начинается голосование за рестарт!\nНапишите [cyan]/restart[#78b193] чтобы проголосовать [cyan]за[#78b193] рестарт\nГолосование окончиться через 1мин");
         localisation.put("VotingStart_en", "[gray]<[cyan]SERVER[gray]> [#78b193]Started voting for restart!\nSend [cyan]/restart[#78b193] to vote [cyan]for[#78b193] restart\nVoting ends in 1min");
 

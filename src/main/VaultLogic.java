@@ -18,7 +18,7 @@ public class VaultLogic {
             if (action.type != Administration.ActionType.placeBlock) return true;
 
             if (!valid_test(action.tile, action.player.team()) && action.block == Blocks.vault) {
-                action.player.sendMessage("[gray]<[cyan]SERVER[gray]> [#f]Слишком близко к вражескому ядру");
+                action.player.sendMessage(Localisation.local(action.player, "closeEnemyErr"));
                 action.tile.setNet(Blocks.air);
                 return false;
             }
@@ -35,7 +35,7 @@ public class VaultLogic {
                 Groups.player.forEach(player -> {
                     if (player.team() == event.tile.build.team())
                     {
-                        player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193]Ядро установлено! [gray]Если вы не видите ядро, введите /sync");
+                        player.sendMessage(Localisation.local(player, "CoreSet"));
                     }
                 });
             }
@@ -43,11 +43,12 @@ public class VaultLogic {
     }
     public static Boolean valid_test(Tile tile, Team team) {
         boolean is_valid = true;
-        for (int x_add = -100; x_add <= 100; x_add+=3)
+        int r = 196;
+        for (int x_add = -r; x_add <= r; x_add+=3)
         {
-            for (int y_add = -100; y_add <= 100; y_add+=3)
+            for (int y_add = -r; y_add <= r; y_add+=3)
             {
-                if (Math.sqrt((x_add * x_add) + (y_add * y_add)) < 100)
+                if (Math.sqrt((x_add * x_add) + (y_add * y_add)) < r)
                 {
                     Tile test_tile = Vars.world.tile(tile.x + x_add, tile.y + y_add);
                     if ((test_tile != null) && (BlocksTypes.cores.contains(test_tile.block())) && (test_tile.build.team() != team))
