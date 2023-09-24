@@ -43,7 +43,7 @@ public class VaultLogic {
     }
     public static Boolean valid_test(Tile tile, Team team) {
         boolean is_valid = true;
-        int r = 196;
+        int r = 175;
         for (int x_add = -r; x_add <= r; x_add+=3)
         {
             for (int y_add = -r; y_add <= r; y_add+=3)

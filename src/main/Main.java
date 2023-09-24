@@ -1,5 +1,7 @@
 package main;
 
+import mindustry.world.Block;
+import mindustry.world.Build;
 import mindustry.world.Tile;
 import mindustry.game.*;
 import mindustry.mod.Plugin;
@@ -22,10 +24,7 @@ import main.Constants.Rules;
 import mindustry.net.Administration.Config;
 
 public class Main extends Plugin {
-    public Map<String, PlayerInfo> players_info = new HashMap<String, PlayerInfo>();
-    public Map<Team, TeamInfo> teams_info = new HashMap<Team, TeamInfo>();
     public int last_team = 0;
-    public Integer time = 0;
     public Integer maxTime = 648000;
     public Integer voiting_time = 0;
     public Boolean restart_voiting = false;
@@ -45,16 +44,16 @@ public class Main extends Plugin {
 
 
         Events.on(EventType.WorldLoadEvent.class, event -> {
-            players_info = new HashMap<String, PlayerInfo>();
-            teams_info = new HashMap<Team, TeamInfo>();
-            time = 0;
+            Cache.players_info = new HashMap<String, PlayerInfo>();
+            Cache.teams_info = new HashMap<Team, TeamInfo>();
+            Cache.time = 0;
             last_team = 5;
             voiting_time = 0;
             restart_voiting = false;
             voted = new ArrayList<String>();
 
             for (Team team : Team.all) {
-                teams_info.put(team, new TeamInfo());
+                Cache.teams_info.put(team, new TeamInfo());
             }
 
             Log.info("world load");
@@ -68,11 +67,11 @@ public class Main extends Plugin {
         Events.on(EventType.PlayerJoin.class, event -> {
             Player pl = event.player;
             Log.info(pl.locale);
-            if (!players_info.containsKey(pl.uuid()))
+            if (!Cache.players_info.containsKey(pl.uuid()))
             {
-                players_info.put(pl.uuid(), new PlayerInfo());
+                Cache.players_info.put(pl.uuid(), new PlayerInfo());
             }
-            pl.team(players_info.get(pl.uuid()).team);
+            pl.team(Cache.players_info.get(pl.uuid()).team);
 
             if (pl.team() == Team.all[0])
             {
@@ -85,7 +84,7 @@ public class Main extends Plugin {
             if (pl.team().data().buildings.size < 5)
             {
                 kill_team(pl.team());
-                players_info.put(pl.uuid(), new PlayerInfo());
+                Cache.players_info.put(pl.uuid(), new PlayerInfo());
             }
         });
         
@@ -94,12 +93,12 @@ public class Main extends Plugin {
             Tile tile = event.tile;
 
             if (player.team() == Team.all[0]) {
-                if (players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown > time)
+                if (Cache.players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown > Cache.time)
                 {
-                    player.sendMessage(String.format(Localisation.local(player, "respawnSpeedErr"), Math.round((players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown - time) / 60)));
+                    player.sendMessage(String.format(Localisation.local(player, "respawnSpeedErr"), Math.round((Cache.players_info.getOrDefault(player.uuid(), new PlayerInfo()).respawn_coldown - Cache.time) / 60)));
                     return;
                 }
-                if (BlocksTypes.nonvalid_floors.contains(tile.floor()))
+                if (BlocksTypes.nonvalid_floors.contains(tile.floor()) || !Build.validPlace(Blocks.malign, Team.all[0], tile.x, tile.y, 0))
                 {
                     player.sendMessage(Localisation.local(player, "InvalidFloor"));
                     return;
@@ -113,16 +112,18 @@ public class Main extends Plugin {
                 Team new_team = takeNewTeam();
                 tile.setNet(Blocks.coreNucleus, new_team, 0);
                 player.team(new_team);
-                players_info.get(player.uuid()).team = new_team;
+                Cache.players_info.get(player.uuid()).team = new_team;
+                Cache.players_info.get(player.uuid()).leader = true;
+                Cache.teams_info.get(new_team).leader = player.uuid();
             }
         });
 
         Events.run(EventType.Trigger.update, () -> {
-            time += 1;
+            Cache.time += 1;
             Groups.player.forEach(p -> {
-                if (!players_info.containsKey(p.uuid()))
+                if (!Cache.players_info.containsKey(p.uuid()))
                 {
-                    players_info.put(p.uuid(), new PlayerInfo());
+                    Cache.players_info.put(p.uuid(), new PlayerInfo());
                 }
             });
             
@@ -147,41 +148,91 @@ public class Main extends Plugin {
                 }
             }
 
-            if (Vars.world.width() != 0) 
+            if (Vars.world.width() != 0)
             {
-                if (time % 10 == 0) 
+                if (Cache.time % 10 == 0)
                 {
                     Groups.player.forEach(p -> {
                         if (!p.team().active() && p.team() != Team.all[0]) {
                             p.team(Team.all[0]);
-                            players_info.get(p.uuid()).respawn_coldown = time + 60 * 30;
-                            players_info.get(p.uuid()).team = Team.all[0];
+                            Cache.players_info.get(p.uuid()).respawn_coldown = Cache.time + 60 * 30;
+                            Cache.players_info.get(p.uuid()).team = Team.all[0];
                         }
                         if (p.team() == Team.all[0])
                         {
                             p.unit().kill();
+                            Cache.players_info.get(p.uuid()).leader = false;
+                        }
+                    });
+                }
+
+                if (Cache.time % 60 == 0)
+                {
+                    int time_left = maxTime - Cache.time;
+                    int minute = (int)(time_left / 60 / 60 % 60);
+                    int hour = (int)(time_left / 60 / 60 / 60 % 60);
+                    Config.desc.set("[#78b193]Open world PVP with mixtech\n[#78b193]Restart in [cyan]" + (hour > 0 ? hour + "h " : " ") + (minute > 0 ? minute + "m" : ""));
+                    
+                    for (Team team : Team.all) 
+                    {
+                        TeamInfo info = Cache.teams_info.get(team);
+                        info.units_cap = 0;
+                        info.item_cap = 0;
+                        info.score = 0;
+                    }
+                    
+                    List<Building> cores_was = new ArrayList<Building>();
+                    Vars.world.tiles.forEach(tile -> {
+                        if (tile.build != null) {
+                            Team bteam = tile.build.team();
+                            TeamInfo info = Cache.teams_info.get(bteam);
+                            if (BlocksTypes.cores.contains(tile.block()) && !cores_was.contains(tile.build))
+                            {
+                                if (bteam == Team.all[0])
+                                {
+                                    tile.build.kill();
+                                }
+                                else
+                                {
+                                    info.units_cap += tile.block().unitCapModifier;
+                                    info.item_cap += tile.block().itemCapacity;
+                                    cores_was.add(tile.build);
+                                }
+                            }
+                            info.score += Math.round(tile.block().health / 100);
                         }
                     });
 
                     for (Team team : Team.all) 
                     {
-                        TeamInfo info = teams_info.get(team);
+                        if (Cache.teams_info.get(team).item_cap == 0 && team != Team.all[0])
+                            kill_team(team);
+                    }
+
+                    for (Team team : Team.all)
+                    {
+                        TeamInfo info = Cache.teams_info.get(team);
                         if (info.join_requests.size() != 0)
                         {
                             for (JoinRequest request : info.join_requests)
                             {
-                                if (time - request.time > 3600)
+                                if (Cache.time - request.time > 3600)
                                 {
                                     request.status = 2;
                                 }
                                 Groups.player.forEach(player -> {
+                                    if (request.unread && player.team() == team)
+                                    {
+                                        player.sendMessage(String.format(Localisation.local(player, "RequestMessageToTeam"), Groups.player.find(pl -> {return pl.uuid() == request.player;}).name));
+                                        request.unread = false;
+                                    }
                                     if (player.uuid() == request.player)
                                     {
                                         if (request.status == 1)
                                         {
                                             player.sendMessage(String.format(Localisation.local(player, "AcceptPlayer"), team.id));
                                             player.team(team);
-                                            players_info.get(player.uuid()).team = team;
+                                            Cache.players_info.get(player.uuid()).team = team;
                                         }
                                         else if (request.status == 2)
                                         {
@@ -211,65 +262,21 @@ public class Main extends Plugin {
                             }
                         }
                     }
-                }
-
-                if (time % 60 == 0) 
-                {
-                    int time_left = maxTime - time;
-                    int minute = (int)(time_left / 60 / 60 % 60);
-                    int hour = (int)(time_left / 60 / 60 / 60 % 60);
-                    Config.desc.set("[#78b193]Open world PVP with mixtech\n[#78b193]Restart in [cyan]" + (hour > 0 ? hour + "h " : " ") + (minute > 0 ? minute + "m" : ""));
-                    
-                    for (Team team : Team.all) 
-                    {
-                        TeamInfo info = teams_info.get(team);
-                        info.units_cap = 0;
-                        info.item_cap = 0;
-                        info.score = 0;
-                    }
-                    
-                    List<Building> cores_was = new ArrayList<Building>();
-                    Vars.world.tiles.forEach(tile -> {
-                        if (tile.build != null) {
-                            Team bteam = tile.build.team();
-                            TeamInfo info = teams_info.get(bteam);
-                            if (BlocksTypes.cores.contains(tile.block()) && !cores_was.contains(tile.build))
-                            {
-                                if (bteam == Team.all[0])
-                                {
-                                    tile.build.kill();
-                                }
-                                else
-                                {
-                                    info.units_cap += tile.block().unitCapModifier;
-                                    info.item_cap += tile.block().itemCapacity;
-                                    cores_was.add(tile.build);
-                                }
-                            }
-                            info.score += Math.round(tile.block().health / 100);
-                        }
-                    });
-
-                    for (Team team : Team.all) 
-                    {
-                        if (teams_info.get(team).item_cap == 0 && team != Team.all[0] && team.id <= last_team)
-                            kill_team(team);
-                    }
                     
                     Groups.player.forEach(p -> {
                         Team team = p.team();
-                        String text = String.format(Localisation.local(p, "MaxUnitsAndItems"), teams_info.get(team).units_cap);
+                        String text = String.format(Localisation.local(p, "MaxUnitsAndItems"), Cache.teams_info.get(team).units_cap);
                         float sub = 1000;
                         int ks = 0;
 
-                        while (1 < teams_info.get(team).item_cap / sub) 
+                        while (1 < Cache.teams_info.get(team).item_cap / sub)
                         {
                             sub = sub * 1000;
                             ks += 1;
                         }
 
-                        if (teams_info.get(team).item_cap > 1000) text += Math.round(teams_info.get(team).item_cap) / Math.pow(1000, ks);
-                        else text += Math.round(teams_info.get(team).item_cap);
+                        if (Cache.teams_info.get(team).item_cap > 1000) text += Math.round(Cache.teams_info.get(team).item_cap) / Math.pow(1000, ks);
+                        else text += Math.round(Cache.teams_info.get(team).item_cap);
                         for (int i = 0; i < ks; i++) 
                         {
                             text += "K";
@@ -303,65 +310,21 @@ public class Main extends Plugin {
         });
 
         handler.<Player>register("team", " ", "Выводит ID вашей команды", (args, player) -> {
-            player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193] ID: " + player.team().id);
+            //player.sendMessage("[gray]<[cyan]SERVER[gray]> [#78b193] ID: " + player.team().id);
+            MenuManager.callTeamMenu(player);
         });
 
-        handler.<Player>register("join", "<id>", "Позволяет вступить в команду другого игрока", (args, player) -> {
-            if (!isInteger(args[0]))
-            {
-                player.sendMessage(Localisation.local(player, "NotID"));
-                return;
-            }
-            Integer id = Integer.valueOf(args[0]);
-            if (id == 0)
-            {
-                player.sendMessage(Localisation.local(player, "SpectatorTip"));
-                return;
-            }
-            if (!Team.all[id].active())
-            {
-                player.sendMessage(Localisation.local(player, "NotActive"));
-                return;
-            }
-            if (id == player.team().id)
-            {
-                player.sendMessage(String.format(Localisation.local(player, "SameTeam"), id));
-                return;
-            }
-            if (player.team().id != 0)
-            {
-                player.sendMessage(Localisation.local(player, "OnlySpectator"));
-                return;
-            }
-            for (Team team : Team.all) 
-            {
-                TeamInfo info = teams_info.get(team);
-                if (info.join_requests.size() != 0)
-                {
-                    for (JoinRequest request : info.join_requests)
-                    {
-                        if (request.player == player.uuid())
-                        {
-                            player.sendMessage(Localisation.local(player, "AlreadyHaveActive"));
-                            return;
-                        }
-                    }
-                }
-            }
-            TeamInfo info = teams_info.get(Team.all[id]);
-            info.join_requests.add(new JoinRequest(player.uuid(), time));
-            player.sendMessage(String.format(Localisation.local(player, "RequestSent"), id));
-
-            Groups.player.forEach(p -> {
-                if (p.team().id == id)
-                {
-                    p.sendMessage(String.format(Localisation.local(player, "RequestMessageToTeam"), player.name));
-                }
-            });
+        handler.<Player>register("join", " ", "Позволяет вступить в команду другого игрока", (args, player) -> {
+            MenuManager.callJoinMenu(player);
         });
 
         handler.<Player>register("accept", " ", "Принимает последний сделанный запрос на вступление к вам в команду", (args, player) -> {
-            TeamInfo info = teams_info.get(player.team());
+            TeamInfo info = Cache.teams_info.get(player.team());
+            if (info.leader != player.uuid())
+            {
+                player.sendMessage(Localisation.local(player, "LeaderError"));
+                return;
+            }
             if (info.join_requests.size() == 0)
             {
                 player.sendMessage(Localisation.local(player, "HaventAnyRequests"));
@@ -378,7 +341,12 @@ public class Main extends Plugin {
         });
 
         handler.<Player>register("deny", " ", "Отклоняет последний сделанный запрос на вступление к вам в команду", (args, player) -> {
-            TeamInfo info = teams_info.get(player.team());
+            TeamInfo info = Cache.teams_info.get(player.team());
+            if (info.leader != player.uuid())
+            {
+                player.sendMessage(Localisation.local(player, "LeaderError"));
+                return;
+            }
             if (info.join_requests.size() == 0)
             {
                 player.sendMessage(Localisation.local(player, "HaventAnyRequests"));
@@ -397,8 +365,14 @@ public class Main extends Plugin {
 
         handler.<Player>register("spectate", " ", "Делает вашу базу заброшенной, а вас наблюдателем", (args, player) -> {
             if (player.team() != Team.all[0]) {
+                if (player.team().data().players.size > 1 && Cache.players_info.get(player.uuid()).leader)
+                {
+                    player.sendMessage(Localisation.local(player, "CantBeLeader"));
+                    return;
+                }
                 if (player.team().data().players.size <= 1) kill_team(player.team());
-                players_info.get(player.uuid()).team = Team.all[0];
+                Cache.players_info.get(player.uuid()).team = Team.all[0];
+                Cache.players_info.get(player.uuid()).leader = false;
                 player.team(Team.all[0]);
             } else {
                 player.sendMessage(Localisation.local(player, "AlreadySpectate"));
@@ -440,8 +414,14 @@ public class Main extends Plugin {
     }
 
     public Team takeNewTeam () {
-        last_team += 1;
-        return Team.all[last_team];
+        for (Team team : Team.all)
+        {
+            if (!team.active() && team.id > 5)
+            {
+                return team;
+            }
+        }
+        return Team.all[0];
     }
 
     public static boolean isInteger(String str) {

@@ -8,6 +8,7 @@ public class TeamInfo {
     public Integer item_cap;
     public Integer score;
     public ArrayList<JoinRequest> join_requests;
+    public String leader;
 
     public TeamInfo()
     {
@@ -15,5 +16,6 @@ public class TeamInfo {
         this.item_cap = 0;
         this.score = 0;
         this.join_requests = new ArrayList<JoinRequest>();
+        this.leader = null;
     }
 }
