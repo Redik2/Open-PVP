@@ -1,5 +1,6 @@
-package main;
+package main.Managers;
 import arc.util.Log;
+import main.*;
 import mindustry.entities.EntityGroup;
 import mindustry.game.Team;
 import mindustry.game.Teams;
@@ -7,8 +8,6 @@ import mindustry.gen.Call;
 import mindustry.gen.Groups;
 import mindustry.gen.Player;
 import mindustry.ui.Menus;
-import main.Main;
-import main.Localisation;
 
 import java.lang.reflect.Array;
 import java.util.HashMap;
@@ -30,6 +29,10 @@ public class MenuManager {
             if (option == 1)
             {
                 callRulesMenu(player);
+            }
+            else if (option == 2)
+            {
+                Call.openURI(player.con(), "https://discord.com/invite/QdsUAazufw");
             }
         });
 
@@ -103,7 +106,7 @@ public class MenuManager {
     public static void callGuideMenu(Player player)
     {
         Call.menu(player.con(), guideMenu, "GUIDE", Localisation.local(player, "Guide"),
-                new String[][]{{"OK", "Rules"}});
+                new String[][]{{"OK", Localisation.local(player, "RulesB"), Localisation.local(player, "Discord")}});
     }
     public static void callRulesMenu(Player player)
     {
@@ -128,7 +131,7 @@ public class MenuManager {
                 {
                     if (request.player == player.uuid())
                     {
-                        player.sendMessage(Localisation.local(player, "AlreadyHaveActive"));
+                        player.sendMessage(Localisation.local(player, "AlreadyHaveRequest"));
                         return;
                     }
                 }
@@ -143,7 +146,7 @@ public class MenuManager {
             localPlayerList_[i[0]] = p;
             i[0] += 1;
             String hex = String.format("[#%02x%02x%02x]", Math.round(p.team().color.r * 255), Math.round(p.team().color.g * 255), Math.round(p.team().color.b * 255));
-            buttons[i[0]] = new String[]{String.format("%s%s [white]%s", hex, (infos.get(p.uuid()).leader ? "\uE809 " : "●"), p.name)};
+            buttons[i[0]] = new String[]{String.format("%s%s %s", hex, (infos.get(p.uuid()).leader ? "\uE809 " : "●"), p.coloredName())};
         });
         localPlayerList.put(player.uuid(), localPlayerList_);
         Call.menu(player.con(), joinMenu, "PLAYERS", " ", buttons);
@@ -174,9 +177,9 @@ public class MenuManager {
             localPlayerList_[i[0]] = p;
             i[0] += 1;
             if (p != player)
-                buttons[i[0]] = new String[]{p.name, "[yellow]\uE809", "[red]✖"};
+                buttons[i[0]] = new String[]{p.coloredName(), "[yellow]\uE809", "[red]✖"};
             else
-                buttons[i[0]] = new String[]{p.name, "[gray]\uE809", "[gray]✖"};
+                buttons[i[0]] = new String[]{p.coloredName(), "[gray]\uE809", "[gray]✖"};
         });
         localPlayerList.put(player.uuid(), localPlayerList_);
         Call.menu(player.con(), teamMenu, "TEAM", "[red]✖ []- kick | [yellow]\uE809 []- make leader", buttons);
